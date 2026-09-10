@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Commodity Drilldown — Household Price Intelligence</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .layout { display: grid; grid-template-columns: 260px 1fr; gap: 24px; align-items: start; }
+  .commodity-list { background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 78vh; overflow-y: auto; }
+  .commodity-list .cat { font-family: var(--font-label); font-size: 10.5px; text-transform: uppercase; color: var(--neutral-light); padding: 10px 14px 4px; }
+  .commodity-list a { display: block; padding: 6px 14px; font-size: 13.5px; color: var(--primary); text-decoration: none; }
+  .commodity-list a:hover, .commodity-list a.active { background: #F5F3EC; }
+  #search { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; font-family: var(--font-body); font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="topnav" id="topnav"></div>
+<div class="page">
+  <p class="eyebrow" id="crumb">Commodity Drilldown</p>
+  <h1 class="page-title" id="commodityTitle">Loading…</h1>
+  <p class="subtitle" id="commoditySub"></p>
+
+  <div class="layout">
+    <div>
+      <input id="search" placeholder="Search commodity…">
+      <div class="commodity-list" id="list"></div>
+    </div>
+    <div id="detail" class="loading">Select a commodity…</div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+let ALL_PRODUCTS = [];
+
+function currentId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("id");
+}
+
+function renderList(filter = "") {
+  const grouped = {};
+  ALL_PRODUCTS.filter(p => p.commodity.toLowerCase().includes(filter.toLowerCase()))
+    .forEach(p => { (grouped[p.category] ||= []).push(p); });
+  const activeId = currentId();
+  document.getElementById("list").innerHTML = Object.entries(grouped).map(([cat, items]) => `
+    <div class="cat">${cat}</div>
+    ${items.map(p => `<a href="/commodity.html?id=${p.id}" class="${String(p.id) === activeId ? 'active' : ''}">${p.commodity}</a>`).join("")}
+  `).join("");
+}
+
+async function loadDetail(id, city) {
+  const detail = document.getElementById("detail");
+  detail.innerHTML = `<div class="loading">Loading ${id}…</div>`;
+  const d = await fetchJSON(`/api/commodity/${id}?city=${encodeURIComponent(city)}`);
+  const p = d.product;
+  document.getElementById("commodityTitle").textContent = `${p.commodity} Price Intelligence`;
+  document.getElementById("crumb").textContent = `Commodity Drilldown · ${city}`;
+  document.getElementById("commoditySub").textContent =
+    `Latest Observed Price. Standard unit: ₹/${p.standard_unit}. ${p.structural_flag ? "Structural" : "Volatile"} · ${p.essential_flag ? "Essential" : "Non-essential"}${p.regional_relevance === 'telangana' ? ' · Telangana-relevant' : ''}`;
+
+  const channels = ["mandi", "official", "local_retail", "supermarket", "quick_commerce"];
+  const labels = {mandi: "Mandi", official: "Official (Govt)", local_retail: "Local Retail", supermarket: "Supermarket", quick_commerce: "Q-Commerce"};
+  const chainHtml = channels.filter(c => d.latest_prices_per_kg_equivalent[c] !== undefined).map(c => `
+    <div class="chain-node">
+      <div class="label">${labels[c]}</div>
+      <div class="price">₹${d.latest_prices_per_kg_equivalent[c].toFixed(2)}</div>
+    </div>
+  `).join(`<div class="chain-arrow">→</div>`);
+
+  const histSeries = d.history.local_retail || [];
+  const historyChan = d.history.local_retail ? "Local Retail" : Object.keys(d.history)[0];
+
+  const telangana = d.telangana_lens || {};
+  const telanganaRows = Object.entries(telangana).map(([city_, price]) => `<tr><td>${city_}</td><td>₹${price.toFixed(2)}</td></tr>`).join("");
+
+  detail.innerHTML = `
+    <div class="card">
+      <p class="card-label">Price History (Local Retail, full seeded window — hover any point)</p>
+      ${lineChartSVG(histSeries, {height: 240})}
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <p class="card-label">Current Multi-Channel Benchmarks (₹/${p.standard_unit})</p>
+      <div class="chain-strip">${chainHtml || '<p class="footnote">No channel data for this city.</p>'}</div>
+    </div>
+
+    <div class="grid grid-4" style="margin-top:16px;">
+      <div class="card"><p class="card-label">WoW</p><p class="card-value ${pctClass(d.wow_pct)}" style="font-size:22px;">${fmtPct(d.wow_pct)}</p>${d.wow_plausibility && d.wow_plausibility.flagged ? '<p class="footnote" style="color:#B23A2E;font-weight:600;">⚠ Review Required</p>' : ''}</div>
+      <div class="card"><p class="card-label">MoM</p><p class="card-value ${pctClass(d.mom_pct)}" style="font-size:22px;">${fmtPct(d.mom_pct)}</p>${d.mom_plausibility && d.mom_plausibility.flagged ? '<p class="footnote" style="color:#B23A2E;font-weight:600;">⚠ Review Required</p>' : ''}</div>
+      <div class="card"><p class="card-label">YoY</p><p class="card-value" style="font-size:16px;color:var(--neutral-light);">${d.yoy_pct === null ? "Insufficient history" : fmtPct(d.yoy_pct)}</p>${d.yoy_plausibility && d.yoy_plausibility.flagged ? '<p class="footnote" style="color:#B23A2E;font-weight:600;">⚠ Review Required — click below</p>' : ''}</div>
+      <div class="card"><p class="card-label">Signal Confidence</p><p class="card-value"><span class="badge ${d.signal_confidence.toLowerCase()}" style="font-size:14px;">${d.signal_confidence}</span></p></div>
+    </div>
+
+    ${[d.wow_plausibility, d.mom_plausibility, d.yoy_plausibility].some(p => p && p.flagged) ? `
+    <div class="card" style="margin-top:16px;border-color:#B23A2E;">
+      <p class="card-label" style="color:#B23A2E;">⚠ Plausibility Review Required</p>
+      ${[["WoW", d.wow_plausibility], ["MoM", d.mom_plausibility], ["YoY", d.yoy_plausibility]].filter(([_, p]) => p && p.flagged).map(([label, p]) => `
+        <p style="margin:6px 0 2px;font-weight:600;">${label}: ${fmtPct(p.observed_pct)} exceeds the ${p.threshold_pct}% plausibility ceiling for this period.</p>
+      `).join("")}
+      <p class="footnote" style="margin-top:6px;">Possible reasons before treating this as a confirmed finding: unit conversion error, different SKU/variety/grade being compared, synthetic/seed data artifact, missing or thin historical baseline, or a genuine market shock (verify against a second source).</p>
+    </div>` : ""}
+
+    <div class="grid grid-2" style="margin-top:16px;">
+      <div class="card">
+        <p class="card-label">Wholesale-to-Retail Price Spread</p>
+        <p class="card-value" style="font-size:20px;">${d.wholesale_to_retail_spread ? d.wholesale_to_retail_spread.spread_pct + "%" : "N/A — no mandi benchmark for this item"}</p>
+        <p class="footnote">Observed difference between upstream and consumer price. May include logistics, wastage, packaging, taxes, distribution and retail costs, and margin — not attributed to any one factor without evidence.</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Quick-Commerce Premium (vs Supermarket)</p>
+        <p class="card-value" style="font-size:20px;">${fmtPct(d.quick_commerce_premium_pct)}</p>
+        <p class="footnote">Compared against comparable supermarket price, not mandi.</p>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:16px;">
+      <div class="card">
+        <p class="card-label">Retail Transmission Lag</p>
+        <p class="card-value" style="font-size:20px;">${d.retail_transmission_lag ? d.retail_transmission_lag.lag_days + " days" : "Insufficient evidence"}</p>
+        <p class="footnote">${d.retail_transmission_lag ? "Correlation strength: " + d.retail_transmission_lag.correlation : "Requires daily mandi + retail history."}</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Price Stickiness</p>
+        <p class="card-value" style="font-size:18px;">${d.price_stickiness ? fmtPct(d.price_stickiness.pass_through_on_rise_pct,0) + " up · " + fmtPct(d.price_stickiness.pass_through_on_fall_pct,0) + " down" : "Insufficient evidence"}</p>
+        <p class="footnote">Share of an upstream move that passes through, split by direction.</p>
+      </div>
+    </div>
+
+    <div class="section-title">Regional Comparison — Telangana Lens</div>
+    ${telanganaRows ? `<table><thead><tr><th>City</th><th>Local Retail Price</th></tr></thead><tbody>${telanganaRows}</tbody></table>`
+      : `<p class="footnote">Not tracked in Siddipet/Nizamabad for this item.</p>`}
+
+    <div class="dark-card" style="margin-top:20px;">
+      <p class="card-label">Intelligence Note</p>
+      <p>WoW movement of ${fmtPct(d.wow_pct)} at local retail. Likely driver classification: <strong>${d.likely_driver}</strong>.</p>
+      <p class="footnote" style="color:#9FC3C6;">Driver labels are Confirmed / Likely / Possible / Insufficient Evidence — never asserted as fact from correlation alone.</p>
+    </div>
+  `;
+}
+
+async function main() {
+  await initTopNav("commodity");
+  ALL_PRODUCTS = await fetchJSON("/api/commodities");
+  renderList();
+  document.getElementById("search").addEventListener("input", (e) => renderList(e.target.value));
+
+  const id = currentId();
+  const city = getCity();
+  if (id) {
+    await loadDetail(id, city);
+  } else if (ALL_PRODUCTS.length) {
+    window.location.search = `?id=${ALL_PRODUCTS[0].id}`;
+  }
+}
+main();
+</script>
+</body>
+</html>

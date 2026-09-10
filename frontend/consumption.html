@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Consumption — Household Price Intelligence</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div class="topnav" id="topnav"></div>
+<div class="page">
+  <p class="eyebrow">Demand Side</p>
+  <h1 class="page-title">Rural vs. Urban Consumption</h1>
+  <p class="subtitle" id="sourceNote">Loading…</p>
+  <div id="content" class="loading">Loading…</div>
+</div>
+<script src="/static/js/app.js"></script>
+<script>
+const LABELS = {
+  cereals_and_substitutes: "Cereals & Substitutes",
+  pulses_and_products: "Pulses & Products",
+  sugar_and_salt: "Sugar & Salt",
+  milk_and_products: "Milk & Products",
+  vegetables: "Vegetables",
+  fruits: "Fruits",
+  egg_fish_meat: "Egg, Fish & Meat",
+  edible_oil: "Edible Oil",
+  spices: "Spices",
+  beverages_refreshments_processed_food: "Beverages & Processed Food",
+  food_total: "Food (Total)",
+  non_food_total: "Non-Food (Total)",
+};
+
+async function render() {
+  await initTopNav("consumption");
+  const d = await fetchJSON("/api/consumption/hces");
+
+  if (!d.by_item_group) {
+    document.getElementById("sourceNote").textContent = d.note || "No data available.";
+    document.getElementById("content").innerHTML = "";
+    return;
+  }
+
+  document.getElementById("sourceNote").innerHTML =
+    `MoSPI Household Consumption Expenditure Survey, ${d.survey_round} — ` +
+    `<a href="${d.source_url}" target="_blank" rel="noopener">source PDF</a>. ` +
+    `This is a periodic government survey, not a live feed — the next round will not update this page until it's published and re-seeded.`;
+
+  const foodTotal = d.by_item_group.food_total;
+  const gap = d.food_share_gap_rural_minus_urban_pts;
+
+  const itemRows = Object.entries(d.by_item_group)
+    .filter(([k]) => k !== "food_total" && k !== "non_food_total")
+    .sort((a, b) => (b[1].rural?.share_pct || 0) - (a[1].rural?.share_pct || 0));
+
+  document.getElementById("content").innerHTML = `
+    <div class="grid grid-3" style="margin-bottom:20px;">
+      <div class="card">
+        <p class="card-label">Rural Food Share of MPCE</p>
+        <p class="card-value">${foodTotal.rural.share_pct}%</p>
+        <p class="card-sub">₹${foodTotal.rural.mpce_rs}/month average</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Urban Food Share of MPCE</p>
+        <p class="card-value">${foodTotal.urban.share_pct}%</p>
+        <p class="card-sub">₹${foodTotal.urban.mpce_rs}/month average</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Rural − Urban Gap</p>
+        <p class="card-value ${gap > 0 ? 'up' : 'down'}">+${gap} pts</p>
+        <p class="card-sub">Rural households spend a structurally larger share of their budget on food</p>
+      </div>
+    </div>
+
+    <h2 class="section-title">By Item Group</h2>
+    <table>
+      <thead><tr><th>Item Group</th><th>Rural Share</th><th>Rural MPCE</th><th>Urban Share</th><th>Urban MPCE</th><th>Rural − Urban (pts)</th></tr></thead>
+      <tbody>
+        ${itemRows.map(([key, vals]) => {
+          const r = vals.rural, u = vals.urban;
+          const diff = r && u ? (r.share_pct - u.share_pct).toFixed(2) : "—";
+          return `
+          <tr>
+            <td>${LABELS[key] || key}</td>
+            <td>${r ? r.share_pct + "%" : "—"}</td>
+            <td>${r ? "₹" + r.mpce_rs : "—"}</td>
+            <td>${u ? u.share_pct + "%" : "—"}</td>
+            <td>${u ? "₹" + u.mpce_rs : "—"}</td>
+            <td class="${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? "+" : ""}${diff}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+
+    <div class="card" style="margin-top:20px;">
+      <p class="card-label">What this does and doesn't tell you yet</p>
+      <p class="card-sub" style="line-height:1.6;">
+        This shows how MPCE (Monthly Per Capita Expenditure) share differs between rural and urban India, at the
+        national level, from the latest published HCES round. It is expenditure share, not a Rural/Urban
+        Essential Basket built from your own price observations — connecting this to the live price engine
+        (so a real Rural Basket and Urban Basket can be tracked against these weights) is separate, scoped work,
+        not yet built. City-level and state-level HCES breakdowns exist in the source survey but are not yet
+        seeded here.
+      </p>
+    </div>
+  `;
+}
+render();
+</script>
+</body>
+</html>

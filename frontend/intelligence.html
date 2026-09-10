@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Intelligence — Household Price Intelligence</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .action-badge { font-family: var(--font-label); font-size: 10.5px; padding: 3px 9px; border-radius: 3px; font-weight: 600; }
+  .action-now { background: var(--primary); color: white; }
+  .action-hold { background: #FBF1DD; color: #8A6A1E; }
+  .action-watch { background: #E4E9EF; color: #35507A; }
+  .action-discard { background: #F0EEE8; color: var(--neutral-light); }
+  .action-bundle { background: #EDEBE1; color: var(--neutral); }
+  select.inline-select { font-family: var(--font-label); font-size: 12px; border: 1px solid var(--border); padding: 6px 10px; border-radius: 4px; background: white; }
+</style>
+</head>
+<body>
+<div class="topnav" id="topnav"></div>
+<div class="page">
+  <p class="eyebrow">AI Intelligence Layer</p>
+  <h1 class="page-title">Pattern Detection, Projection &amp; Publish Timing</h1>
+  <p class="subtitle">Statistical pattern detection and backtested projection — no claim is shown without passing its own evidence check. See the note at the bottom for what "AI-driven" means here.</p>
+
+  <div class="section-title"><span class="icon">◐</span> Publish-Timing Queue</div>
+  <p class="footnote" style="margin-bottom:10px;">When should each finding be surfaced — now, held for confirmation, or bundled into the weekly report? Rule-based on Movement/Materiality/Breadth/Persistence/Evidence, same scores used for classification.</p>
+  <div id="queueContent" class="loading">Loading publish queue…</div>
+
+  <div class="section-title" style="margin-top:36px;"><span class="icon">◐</span> Pattern Explorer</div>
+  <div style="margin-bottom:12px;">
+    <select class="inline-select" id="commoditySelect"></select>
+  </div>
+  <div id="patternContent" class="loading">Select a commodity…</div>
+
+  <div class="section-title" style="margin-top:36px;"><span class="icon">◐</span> International Pricing Context</div>
+  <p class="footnote" style="margin-bottom:10px;">Correlational context only — a global price or FX move is never asserted as a proven cause on its own. Only genuinely defensible drivers are modeled: global edible-oil cost (via USD/tonne benchmark × INR/USD rate), global export reference prices, and diesel/fuel cost. Currency speculation (e.g. Bitcoin) isn't included — there's no plausible transmission mechanism to household food prices.</p>
+  <div id="internationalContent" class="loading">Loading…</div>
+
+  <div class="section-title" style="margin-top:36px;"><span class="icon">◐</span> Regional Supply &amp; Demand</div>
+  <p class="footnote" style="margin-bottom:10px;">V1 scope — see the note under the table for what's real (mandi arrivals) vs synthetic (per-capita consumption index) vs not yet modeled (stocks, imports, inter-state flows).</p>
+  <div style="margin-bottom:12px;">
+    <select class="inline-select" id="regionalCommoditySelect"></select>
+  </div>
+  <div id="regionalContent" class="loading">Select a commodity…</div>
+
+  <div class="section-title" style="margin-top:36px;"><span class="icon">◐</span> Continuous Learning Status</div>
+  <div id="learningContent" class="loading">Loading…</div>
+
+  <p class="footnote" style="margin-top:30px;border-top:1px solid var(--border);padding-top:14px;">
+    What "AI-driven" means here, honestly: (1) Pattern &amp; anomaly detection is real statistics on accumulated history —
+    z-scores against a commodity's own baseline, year-over-year correlation for seasonality. (2) Projections are a simple
+    trend model that must pass its own backtest before being shown — if it fails, you see the backtest error, not a
+    fabricated forecast. (3) Publish timing is a transparent rule combining the five PRD scoring dimensions. (4) The system
+    "learns" by logging its own calls and checking 14 days later whether they held up, nudging its own scoring weights —
+    a real, visible feedback loop, not a black box.
+  </p>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+function actionClass(action) {
+  if (action === "Publish Now") return "action-now";
+  if (action.startsWith("Hold")) return "action-hold";
+  if (action.startsWith("Watch")) return "action-watch";
+  if (action.startsWith("Discard")) return "action-discard";
+  return "action-bundle";
+}
+
+async function renderQueue(city) {
+  const d = await fetchJSON(`/api/intelligence/publish-queue?city=${encodeURIComponent(city)}`);
+  const el = document.getElementById("queueContent");
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Commodity</th><th>WoW</th><th>Anomaly</th><th>Recommended Action</th><th>Reasoning</th><th></th></tr></thead>
+      <tbody>
+        ${d.queue.map((q, i) => `
+          <tr>
+            <td>${q.commodity}</td>
+            <td class="${pctClass(q.wow_pct)}">${fmtPct(q.wow_pct)}</td>
+            <td>${q.anomaly && q.anomaly.flagged ? `z=${q.anomaly.z_score}` : "—"}</td>
+            <td><span class="action-badge ${actionClass(q.recommendation.action)}">${q.recommendation.action}</span></td>
+            <td class="footnote">${q.recommendation.reasoning}</td>
+            <td><a href="#" class="commodity-link" style="font-size:12px;" onclick="toggleEvidence(event, ${i}, '${q.commodity.replace(/'/g, "\\'")}', '${city}')">Why?</a></td>
+          </tr>
+          <tr id="evidence-row-${i}" style="display:none;"><td colspan="6" id="evidence-content-${i}"></td></tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+async function toggleEvidence(e, i, commodity, city) {
+  e.preventDefault();
+  const row = document.getElementById(`evidence-row-${i}`);
+  const content = document.getElementById(`evidence-content-${i}`);
+  if (row.style.display === "table-row") {
+    row.style.display = "none";
+    return;
+  }
+  row.style.display = "table-row";
+  content.innerHTML = `<div class="loading">Loading evidence…</div>`;
+  const products = await fetchJSON("/api/commodities");
+  const product = products.find(p => p.commodity === commodity);
+  if (!product) { content.innerHTML = `<p class="footnote">Not found.</p>`; return; }
+  const ev = await fetchJSON(`/api/intelligence/evidence-trace/${product.id}?city=${encodeURIComponent(city)}`);
+  const cityRows = Object.entries(ev.city_breakdown_30d).map(([c, n]) => `${c}: ${n}`).join(" · ");
+  content.innerHTML = `
+    <div class="dark-card" style="margin:6px 0;">
+      <p class="card-label">Why are we saying this? — ${ev.commodity}</p>
+      <p>Based on <strong>${ev.total_observations_all_cities_30d} observations</strong> across all tracked cities (last 30 days as of ${ev.as_of_date}).</p>
+      <p>By city: ${cityRows || "—"}</p>
+      <p>Date range used: ${ev.date_range[0]} to ${ev.date_range[1]}</p>
+      <p>Sources: ${ev.sources.join(", ") || "—"}</p>
+      <p>Data quality grades (this city): ${Object.entries(ev.data_quality_grade_distribution_this_city).map(([g,n]) => `${g}:${n}`).join(", ") || "—"}${ev.provisional_observations_this_city_30d ? ` · ${ev.provisional_observations_this_city_30d} provisional` : ""}</p>
+      <p class="footnote" style="color:#D7E4E2;margin-top:8px;">${ev.calculation_method}</p>
+    </div>
+  `;
+}
+
+async function renderPattern(id, city) {
+  const el = document.getElementById("patternContent");
+  el.innerHTML = `<div class="loading">Loading…</div>`;
+  const d = await fetchJSON(`/api/intelligence/commodity/${id}?city=${encodeURIComponent(city)}`);
+  const s = d.seasonal_pattern, p = d.trend_projection, a = d.anomaly;
+
+  el.innerHTML = `
+    <div class="grid grid-3">
+      <div class="card">
+        <p class="card-label">Anomaly (vs own baseline)</p>
+        ${a ? `
+          <p class="card-value" style="font-size:20px;">z = ${a.z_score}</p>
+          <p class="card-sub">${a.flagged ? `Flagged (${a.direction})` : "Within normal range"} · baseline ${a.baseline_days}d</p>
+        ` : `<p class="footnote">Insufficient daily history for this city/commodity.</p>`}
+      </div>
+      <div class="card">
+        <p class="card-label">Recurring Seasonal Pattern</p>
+        ${s && s.available ? `
+          <p class="card-value" style="font-size:18px;">${s.peak_month} peak / ${s.trough_month} trough</p>
+          <p class="card-sub"><span class="badge ${s.confidence.toLowerCase()}">${s.confidence}</span> · YoY corr ${s.year_over_year_correlation} · ${s.months_compared} months compared (${s.years_compared.join(" vs ")})</p>
+        ` : `<p class="footnote">${s ? s.reason : "Loading…"}</p>`}
+      </div>
+      <div class="card">
+        <p class="card-label">Model Projection (${p && p.horizon_days ? p.horizon_days : 14}d, backtested)</p>
+        ${p && p.available ? `
+          <p class="card-value ${pctClass(p.projected_pct_change)}" style="font-size:20px;">${fmtPct(p.projected_pct_change)}</p>
+          <p class="card-sub">Backtest MAPE ${p.backtest_mape_pct}% · ${p.method}</p>
+        ` : `<p class="footnote">Not shown — ${p ? p.reason : "insufficient history"}</p>`}
+      </div>
+    </div>
+    ${s && s.available && s.monthly_profile ? `
+    <div class="card" style="margin-top:16px;">
+      <p class="card-label">Monthly Deviation from Trend (avg across ${s.years_compared.join(" & ")})</p>
+      ${barChartSVG(s.monthly_profile.map(m => ({label: m.month, value: m.avg_deviation_pct})))}
+      <p class="footnote">Red = above trend, green = below trend. Hover a bar for the exact figure.</p>
+    </div>` : ""}
+  `;
+}
+
+async function renderInternational(city) {
+  const d = await fetchJSON(`/api/intelligence/international-context?city=${encodeURIComponent(city)}`);
+  const el = document.getElementById("internationalContent");
+  const rows = d.results.filter(r => r.available);
+  const weak = d.results.filter(r => !r.available);
+  el.innerHTML = `
+    <div class="grid grid-3">
+      ${rows.map(r => `
+        <div class="card">
+          <p class="card-label">${r.commodity}</p>
+          <p class="card-sub" style="margin-bottom:6px;">${r.driver_description}</p>
+          <p class="card-value" style="font-size:20px;">${r.correlation}</p>
+          <p class="card-sub"><span class="badge ${r.label === 'Likely Driver' ? 'high' : 'medium'}">${r.label}</span> · ${r.lag_unit === 'months' ? r.lag + ' month(s)' : r.lag + ' day(s)'} lag · ${r.direction}</p>
+        </div>
+      `).join("")}
+    </div>
+    ${weak.length ? `<p class="footnote" style="margin-top:12px;">No confirmed international driver relationship for: ${weak.map(r => r.commodity).join(", ")} — correlation too weak to call it a driver rather than coincidence (this is the honest result, not a gap in the check).</p>` : ""}
+  `;
+}
+
+async function renderRegional(productId, commodity) {
+  const el = document.getElementById("regionalContent");
+  el.innerHTML = `<div class="loading">Loading…</div>`;
+  const d = await fetchJSON(`/api/intelligence/regional-snapshot/${productId}`);
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>City</th><th>Consumption Index (t/mo)</th><th>Supply Index (avg t/day arrivals)</th><th>Deficit/Surplus (t/mo)</th><th>Demand Intensity</th></tr></thead>
+      <tbody>
+        ${d.by_city.map(c => `
+          <tr>
+            <td>${c.city} <span class="footnote">(${c.tier === 'telangana_regional' ? 'TS regional' : 'metro'})</span></td>
+            <td>${c.consumption_index_tonnes_month ?? "—"}</td>
+            <td>${c.supply_index_avg_daily_arrivals_tonnes ?? "—"}</td>
+            <td class="${c.deficit_surplus_tonnes_month > 0 ? 'down' : c.deficit_surplus_tonnes_month < 0 ? 'up' : ''}">${c.deficit_surplus_tonnes_month ?? "—"}</td>
+            <td>${c.demand_intensity_index ?? "—"}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div class="card">
+        <p class="card-label">Dependency (Hyderabad vs regional towns)</p>
+        ${d.dependency ? `<p class="card-value" style="font-size:20px;">${d.dependency.hyderabad_vs_regional_supply_ratio}x</p><p class="card-sub">${d.dependency.interpretation}</p>` : `<p class="footnote">Not enough arrivals data for this commodity in the regional towns.</p>`}
+      </div>
+      <div class="card">
+        <p class="card-label">Price Sensitivity (arrivals → price)</p>
+        ${d.price_sensitivity ? `<p class="card-value" style="font-size:20px;">${d.price_sensitivity.arrivals_to_price_correlation}</p><p class="card-sub">${d.price_sensitivity.interpretation}</p>` : `<p class="footnote">Not enough mandi arrivals history for this commodity.</p>`}
+      </div>
+    </div>
+    <p class="footnote" style="margin-top:12px;">${d.scope_note}</p>
+  `;
+}
+
+async function renderLearning() {
+  const d = await fetchJSON("/api/intelligence/learning-status");
+  const el = document.getElementById("learningContent");
+  el.innerHTML = `
+    <div class="grid grid-3" style="margin-bottom:16px;">
+      <div class="card"><p class="card-label">Insights Logged</p><p class="card-value">${d.total_insights_logged}</p></div>
+      <div class="card"><p class="card-label">Outcomes Evaluated</p><p class="card-value">${d.total_evaluated}</p></div>
+      <div class="card"><p class="card-label">Hit Rate</p><p class="card-value">${d.hit_rate !== null ? (d.hit_rate*100).toFixed(1) + "%" : "—"}</p></div>
+    </div>
+    <table>
+      <thead><tr><th>Scoring Metric</th><th>Current Weight</th><th>Sample Size</th><th>Hit Rate at Last Recalibration</th><th>Last Recalibrated</th></tr></thead>
+      <tbody>
+        ${d.current_weights.map(w => `
+          <tr><td>${w.metric_name}</td><td>${w.weight}</td><td>${w.sample_size}</td><td>${w.hit_rate !== null ? (w.hit_rate*100).toFixed(1)+"%" : "—"}</td><td>${w.last_recalibrated || "Not yet run"}</td></tr>
+        `).join("")}
+      </tbody>
+    </table>
+    <p class="footnote" style="margin-top:10px;">Historical hit rate above comes from a retroactive backtest across the seeded 24-month window (biweekly checkpoints, 14-day-forward check). Going forward, real calls are logged the same way and evaluated automatically as they age past 14 days.</p>
+  `;
+}
+
+async function main() {
+  await initTopNav("intelligence");
+  const city = getCity();
+  await renderQueue(city);
+  await renderInternational(city);
+  await renderLearning();
+
+  const products = await fetchJSON("/api/commodities");
+  const sel = document.getElementById("commoditySelect");
+  sel.innerHTML = products.map(p => `<option value="${p.id}">${p.commodity}</option>`).join("");
+  const tomato = products.find(p => p.commodity === "Tomato");
+  if (tomato) sel.value = tomato.id;
+  await renderPattern(sel.value, city);
+  sel.addEventListener("change", () => renderPattern(sel.value, city));
+
+  const regionalSel = document.getElementById("regionalCommoditySelect");
+  regionalSel.innerHTML = products.map(p => `<option value="${p.id}">${p.commodity}</option>`).join("");
+  const onion = products.find(p => p.commodity === "Onion");
+  if (onion) regionalSel.value = onion.id;
+  await renderRegional(regionalSel.value, regionalSel.options[regionalSel.selectedIndex].text);
+  regionalSel.addEventListener("change", () => renderRegional(regionalSel.value, regionalSel.options[regionalSel.selectedIndex].text));
+}
+main();
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Data Sources — Household Price Intelligence</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div class="topnav" id="topnav"></div>
+<div class="page">
+  <p class="eyebrow">System Status</p>
+  <h1 class="page-title">Data Sources</h1>
+  <p class="subtitle">Real counts from this database — no proprietary node/scraper claims.</p>
+  <div id="content" class="loading">Loading…</div>
+</div>
+<script src="/static/js/app.js"></script>
+<script>
+async function render() {
+  await initTopNav("sources");
+  const d = await fetchJSON("/api/sources");
+  const ingestion = await fetchJSON("/api/ingestion-status");
+  document.getElementById("content").innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <p class="card-label">Daily Update Status</p>
+      <p class="card-sub">Runs automatically every day at 06:00, and once on app startup to catch up if a day was missed. Real connectors are tried first; synthetic continuation only fills in when no real data is available (missing API key, no network).</p>
+      <pre style="font-family:var(--font-label);font-size:12px;background:#F5F3EC;padding:10px;border-radius:4px;overflow-x:auto;">${JSON.stringify(ingestion, null, 2)}</pre>
+    </div>
+    <div class="grid grid-3" style="margin-bottom:20px;">
+      <div class="card"><p class="card-label">Seed / Synthetic Observations</p><p class="card-value">${d.seed_synthetic_observations.toLocaleString()}</p></div>
+      <div class="card"><p class="card-label">Live Observations</p><p class="card-value">${d.live_observations.toLocaleString()}</p></div>
+      <div class="card"><p class="card-label">Cities With Coverage</p><p class="card-value">${d.cities_covered}</p></div>
+    </div>
+    <div class="grid grid-3" style="margin-bottom:20px;">
+      <div class="card"><p class="card-label">Connectors Configured</p><p class="card-value">${d.connectors_configured}</p></div>
+      <div class="card"><p class="card-label">Healthy (Live Data Flowing)</p><p class="card-value ${d.connectors_healthy > 0 ? 'down' : ''}">${d.connectors_healthy}</p></div>
+      <div class="card"><p class="card-label">Pending Credentials / Network</p><p class="card-value">${d.connectors_pending}</p></div>
+    </div>
+    <table>
+      <thead><tr><th>Source</th><th>Data Status</th><th>Confidence</th><th>Connector</th><th>Frequency</th><th>Grade</th><th>Last Run</th><th>Detail</th></tr></thead>
+      <tbody>
+        ${d.sources.map(s => {
+          const statusLabel = {
+            LIVE: "Live",
+            PARTIAL: "Partial",
+            CONFIGURED_NO_LIVE_DATA: "Configured — No Live Data",
+            SYNTHETIC: "Synthetic"
+          }[s.data_status] || s.data_status;
+          const statusClass = {
+            LIVE: "status-live",
+            PARTIAL: "status-partial",
+            CONFIGURED_NO_LIVE_DATA: "status-configured",
+            SYNTHETIC: "status-synthetic"
+          }[s.data_status] || "status-configured";
+          const conf = s.confidence;
+          return `
+          <tr>
+            <td>${s.source_name}</td>
+            <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+            <td>
+              <div class="confidence-cell">
+                <div class="confidence-bar-track"><div class="confidence-bar-fill" style="width:${conf.composite}%;"></div></div>
+                <span>${conf.composite}/100</span>
+              </div>
+              <div class="confidence-dims">${conf.dimensions_scored} of ${conf.dimensions_total} dimensions scored</div>
+            </td>
+            <td><code>${s.connector_name}</code></td>
+            <td>${s.update_frequency}</td>
+            <td>${s.quality_grade_default}</td>
+            <td>${s.last_run_at || "Not yet run (seed data only)"}</td>
+            <td>${s.last_status || "—"}</td>
+          </tr>
+        `; }).join("")}
+      </tbody>
+    </table>
+    <p class="footnote" style="margin-top:16px;">
+      AGMARKNET, Consumer Affairs, CPI and WPI connectors are implemented (see backend/connectors/) but require
+      internet access and API keys to run live — this build environment cannot reach those government endpoints,
+      so the database is currently seeded with clearly-labeled synthetic data matching the real schema.
+      Run the connectors from your own machine to replace seed rows with live observations.
+    </p>
+    <div class="card" style="margin-top:20px;">
+      <p class="card-label">How confidence is scored — and why some rows show fewer than 5 dimensions</p>
+      <p class="card-sub" style="line-height:1.6;">
+        Each source's composite is a weighted sum of five dimensions: <b>Evidence Quality</b> (25%, from the
+        source's declared grade), <b>Source Agreement</b> (20%, the actual % of overlapping observations
+        that fall within 8% of an independent live source's price — not a placeholder), <b>Coverage</b> (20%,
+        cities this source has actually produced data for), <b>Freshness</b> (15%, only meaningful once real
+        data exists), and <b>Historical Reliability</b> (20%, this source's real backtested hit rate from the
+        continuous-learning loop, once it has 10+ scored predictions). Per the frozen PRD, a dimension with no
+        evidence behind it contributes zero rather than a placeholder or a reweighted average — that's why
+        every currently-configured connector shows a low score: with 0 live observations and an empty backtest
+        log, three of five dimensions genuinely cannot be computed yet. This isn't a ceiling — once real data
+        flows and the learning loop has run for a few cycles, this same formula can honestly reach 80%+; it
+        just can't be shortcut by adding more source URLs alone.
+      </p>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <p class="card-label">Export data</p>
+      <p class="card-sub" style="line-height:1.6; margin-bottom:12px;">
+        If this app's own pattern detection (see Commodity pages) isn't enough for what you're trying to check,
+        the raw data is exportable for any external tool or AI to analyze directly. Every row carries its
+        <code>data_quality_score</code> — exclude grade <b>E</b> (synthetic) before drawing any conclusion from
+        an export, exactly as this app's own intelligence layer does internally.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a href="/api/export/dataset.xlsx" class="btn" style="background:var(--primary); color:white; padding:9px 16px; border-radius:4px; text-decoration:none; font-size:13px;">
+          Download Overview (.xlsx)
+        </a>
+        <a href="/api/export/price_observations.csv" class="btn" style="background:var(--rule); color:var(--ink); padding:9px 16px; border-radius:4px; text-decoration:none; font-size:13px;">
+          Full Price History (.csv)
+        </a>
+        <a href="/api/export/inflation_benchmarks.csv" class="btn" style="background:var(--rule); color:var(--ink); padding:9px 16px; border-radius:4px; text-decoration:none; font-size:13px;">
+          Inflation Benchmarks (.csv)
+        </a>
+      </div>
+      <p class="footnote" style="margin-top:10px;">
+        The .xlsx is a fast overview (real data only for prices, plus small reference tables) — the full price
+        history, including synthetic seed data, is large (~900K rows) and only practical as CSV.
+      </p>
+    </div>
+  `;
+}
+render();
+</script>
+</body>
+</html>

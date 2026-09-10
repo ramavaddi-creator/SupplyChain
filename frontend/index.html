@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Household Price Intelligence — Executive Dashboard</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div class="topnav" id="topnav"></div>
+<div class="page">
+  <p class="eyebrow">National Economic Dashboard</p>
+  <h1 class="page-title">Household Price Intelligence</h1>
+  <p class="subtitle" id="freshnessNote">Loading latest observed data…</p>
+
+  <div id="content" class="loading">Loading dashboard…</div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+async function render() {
+  await initTopNav("executive");
+  const city = getCity();
+  const d = await fetchJSON(`/api/dashboard?city=${encodeURIComponent(city)}`);
+  const el = document.getElementById("content");
+
+  document.getElementById("freshnessNote").textContent =
+    `Latest Observed Price data for ${city}. Source freshness and per-item timestamps shown on the Commodity page — this is not a real-time feed.`;
+
+  const eb = d.observed_essential_basket;
+  const ebWow = d.observed_essential_basket_wow;
+  const gap = d.household_reality_gap;
+  const material = d.most_material_this_week || [];
+  const top1 = material[0];
+  const behav = d.behavioural_intelligence_sample;
+  const sv = d.structural_vs_volatile;
+  const unseen = d.unseen_layer || [];
+
+  const avgConfidenceScore = material.length
+    ? material.reduce((a, m) => a + ({High:90,Medium:65,Low:40}[m.signal_confidence]), 0) / material.length
+    : null;
+  const overallConfidenceLabel = avgConfidenceScore === null ? "—" :
+    avgConfidenceScore >= 80 ? "High" : avgConfidenceScore >= 60 ? "Medium" : "Low";
+
+  el.innerHTML = `
+    <div class="grid grid-4">
+      <div class="card">
+        <p class="card-label">Observed Essential Household Basket Inflation</p>
+        <p class="card-value ${pctClass(eb?.pct_change)}">${fmtPct(eb?.pct_change)} <span style="font-size:13px;font-weight:500;">MoM</span></p>
+        <p class="card-sub">${fmtPct(ebWow?.pct_change)} <span class="time-basis">WoW</span> · coverage ${eb?.coverage_pct ?? "—"}%</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Household Reality Gap</p>
+        <p class="card-value ${pctClass(gap?.gap_pts)}">${gap ? (gap.gap_pts > 0 ? "+" : "") + gap.gap_pts.toFixed(2) : "—"} <span style="font-size:13px;font-weight:500;">pts</span></p>
+        <p class="card-sub">Observed basket ${fmtPct(gap?.observed_basket_mom)} MoM vs Official CPI ${fmtPct(gap?.cpi_mom)} MoM</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Most Material This Week</p>
+        <p class="card-value" style="font-size:20px;">${top1 ? top1.commodity : "—"}</p>
+        <p class="card-sub">${top1 ? fmtPct(top1.wow_pct) + " WoW · Impact " + top1.household_impact_score + "/100" : ""}
+          ${top1 ? `<span class="badge ${top1.classification.toLowerCase()}">${top1.classification}</span>` : ""}</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Price Signal Confidence</p>
+        <p class="card-value"><span class="badge ${overallConfidenceLabel.toLowerCase()}" style="font-size:14px;padding:4px 10px;">${overallConfidenceLabel}</span></p>
+        <p class="card-sub">Derived from source quality, coverage, freshness across this week's tracked items</p>
+      </div>
+    </div>
+
+    <div class="section-title">Behavioural Intelligence <span class="footnote" style="font-weight:400;">(example: Toor Dal, ${city})</span></div>
+    <div class="grid grid-4">
+      <div class="card">
+        <p class="card-label">Consumer Benefit Pass-Through</p>
+        <p class="card-value">${behav.consumer_benefit_pass_through ?? "—"}<span style="font-size:14px;">/100</span></p>
+        <p class="card-sub">Share of an upstream price fall that reached local retail</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Retail Transmission Lag</p>
+        <p class="card-value">${behav.retail_transmission_lag ? behav.retail_transmission_lag.lag_days : "—"}<span style="font-size:14px;"> days</span></p>
+        <p class="card-sub">Estimated days for a mandi move to reach local retail</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Price Stickiness</p>
+        <p class="card-value" style="font-size:18px;">${behav.price_stickiness ? fmtPct(behav.price_stickiness.pass_through_on_rise_pct,0) + " up / " + fmtPct(behav.price_stickiness.pass_through_on_fall_pct,0) + " down" : "—"}</p>
+        <p class="card-sub">Pass-through on upstream rises vs falls</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Wholesale-to-Retail Price Spread</p>
+        <p class="card-value">${behav.wholesale_to_retail_spread ? behav.wholesale_to_retail_spread.spread_pct + "%" : "—"}</p>
+        <p class="card-sub">Observed difference — not automatically retailer margin</p>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:16px;">
+      <div class="card">
+        <p class="card-label">Structural vs Volatile (MoM)</p>
+        <p class="card-value" style="font-size:20px;">
+          <span class="${pctClass(sv.structural)}">${fmtPct(sv.structural)}</span> structural &nbsp;·&nbsp;
+          <span class="${pctClass(sv.volatile)}">${fmtPct(sv.volatile)}</span> volatile
+        </p>
+        <p class="card-sub">Recurring essentials vs seasonal produce, weighted by basket contribution</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Quick-Commerce Premium <span class="footnote">(example: Toor Dal)</span></p>
+        <p class="card-value">${fmtPct(behav.quick_commerce_premium_pct)}</p>
+        <p class="card-sub">Vs comparable supermarket price — not vs mandi</p>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="icon">◐</span> Most Material This Week</div>
+    <table>
+      <thead><tr><th>Commodity</th><th>WoW</th><th>Household Impact</th><th>Confidence</th><th>Classification</th><th>Recommended Timing</th></tr></thead>
+      <tbody>
+        ${material.map(m => `
+          <tr>
+            <td>${m.commodity} <span class="footnote">(${m.category})</span></td>
+            <td class="${pctClass(m.wow_pct)}">${fmtPct(m.wow_pct)}</td>
+            <td>${m.household_impact_score}/100</td>
+            <td><span class="badge ${m.signal_confidence.toLowerCase()}">${m.signal_confidence}</span></td>
+            <td><span class="badge ${m.classification.toLowerCase()}">${m.classification}</span></td>
+            <td id="timing-${m.commodity.replace(/[^a-zA-Z0-9]/g,'')}" class="footnote">…</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+
+    <div class="grid grid-2" style="margin-top:24px;">
+      <div class="dark-card">
+        <p class="card-label">Unseen Layer — Consumer Benefit Not Passed Through</p>
+        ${unseen.length ? unseen.map(u => `
+          <p class="card-title">${u.commodity}</p>
+          <p>Pass-through: ${u.consumer_benefit_pass_through}/100${u.retail_transmission_lag_days !== null ? ` · Retail lag: ${u.retail_transmission_lag_days} days` : ""}</p>
+        `).join("<hr style='border-color:#2D5A5E;margin:10px 0;'>") : "<p>No qualifying pass-through gap detected this week.</p>"}
+      </div>
+      <div class="card">
+        <p class="card-label">Telangana Lens</p>
+        <p class="card-sub">See the Weekly Report or Commodity page for the full Hyderabad · Siddipet · Nizamabad comparison.</p>
+        <a class="commodity-link" href="/report.html">View Telangana Lens →</a>
+      </div>
+    </div>
+  `;
+
+  // Populate Recommended Timing column from the publish-timing queue (separate,
+  // slightly heavier call -- kept out of the critical render path)
+  try {
+    const pq = await fetchJSON(`/api/intelligence/publish-queue?city=${encodeURIComponent(city)}`);
+    pq.queue.forEach(q => {
+      const cell = document.getElementById(`timing-${q.commodity.replace(/[^a-zA-Z0-9]/g,'')}`);
+      if (cell) {
+        const cls = q.recommendation.action === "Publish Now" ? "up" : q.recommendation.action.startsWith("Hold") ? "flat" : "";
+        cell.innerHTML = `<span class="${cls}" style="font-weight:600;">${q.recommendation.action}</span>`;
+      }
+    });
+  } catch (e) { /* non-critical */ }
+}
+render();
+</script>
+</body>
+</html>

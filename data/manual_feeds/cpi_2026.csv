@@ -1,0 +1,3 @@
+benchmark_type,commodity_group,state,month,year,value,mom_change,yoy_change,status
+CPI,Headline,Rural,6,2026,107.24,,4.74,final
+CPI,Headline,Urban,6,2026,106.69,,3.92,final

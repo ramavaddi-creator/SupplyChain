@@ -1,0 +1,174 @@
+:root {
+  --primary: #1A3C40;
+  --primary-light: #2D5A5E;
+  --secondary: #2D5A5E;
+  --tertiary: #FAF9F6;
+  --neutral: #454745;
+  --neutral-light: #8a8c8a;
+  --border: #E3E1D9;
+  --up: #B23A2E;
+  --down: #2E7D52;
+  --shock-bg: #1A3C40;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-label: 'JetBrains Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--tertiary);
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.topnav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  background: var(--tertiary);
+  border-bottom: 1px solid var(--border);
+}
+.topnav .brand {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  text-decoration: none;
+}
+.topnav nav { display: flex; gap: 28px; }
+.topnav nav a {
+  font-family: var(--font-label);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--neutral);
+  text-decoration: none;
+  padding-bottom: 4px;
+}
+.topnav nav a.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+.topnav .city-select {
+  font-family: var(--font-label);
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: var(--primary);
+}
+
+.page { max-width: 1240px; margin: 0 auto; padding: 28px 32px 80px; }
+
+.eyebrow {
+  font-family: var(--font-label);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--neutral-light);
+  margin: 0 0 4px;
+}
+h1.page-title { font-size: 26px; font-weight: 600; margin: 0 0 4px; }
+.subtitle { color: var(--neutral); font-size: 14px; margin: 0 0 24px; }
+
+.grid { display: grid; gap: 16px; }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 18px 20px;
+}
+.card-label {
+  font-family: var(--font-label);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--neutral-light);
+  margin: 0 0 8px;
+}
+.card-value { font-size: 30px; font-weight: 600; line-height: 1.1; margin: 0 0 6px; }
+.card-sub { font-size: 12.5px; color: var(--neutral); }
+.card-sub.time-basis { font-family: var(--font-label); color: var(--neutral-light); }
+
+.up { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--neutral); }
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 32px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title .icon { font-size: 13px; }
+
+table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+th, td { text-align: left; padding: 10px 14px; font-size: 13.5px; border-bottom: 1px solid var(--border); }
+th { font-family: var(--font-label); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--neutral-light); background: #F5F3EC; font-weight: 500; }
+tr:last-child td { border-bottom: none; }
+
+.badge {
+  display: inline-block;
+  font-family: var(--font-label);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.badge.high { background: #E4EFE8; color: var(--down); }
+.badge.medium { background: #FBF1DD; color: #8A6A1E; }
+.badge.low { background: #F6E4E1; color: var(--up); }
+.badge.shock { background: var(--primary); color: white; }
+.badge.regular { background: #EDEBE1; color: var(--neutral); }
+.badge.unseen { background: #E4EFE8; color: var(--primary); }
+
+/* Data status — deliberately distinct from High/Medium/Low signal badges
+   above; this describes the source's evidence state, not a price signal. */
+.badge.status-live { background: #E4EFE8; color: var(--down); }
+.badge.status-partial { background: #FBF1DD; color: #8A6A1E; }
+.badge.status-configured { background: #EDEBE1; color: var(--neutral); }
+.badge.status-synthetic { background: #F6E4E1; color: var(--up); }
+
+.confidence-bar-track { background: #EDEBE1; border-radius: 3px; height: 6px; width: 100px; overflow: hidden; }
+.confidence-bar-fill { height: 100%; border-radius: 3px; background: var(--primary-light); }
+.confidence-cell { display: flex; align-items: center; gap: 8px; }
+.confidence-dims { font-family: var(--font-label); font-size: 10.5px; color: var(--neutral-light); }
+
+.dark-card {
+  background: var(--shock-bg);
+  color: white;
+  border-radius: 6px;
+  padding: 20px;
+}
+.dark-card .card-label { color: #9FC3C6; }
+.dark-card .card-title { font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+.dark-card p { font-size: 13.5px; color: #D7E4E2; margin: 0 0 6px; }
+
+.footnote { font-size: 11.5px; color: var(--neutral-light); margin-top: 6px; }
+
+a.commodity-link { color: var(--primary); text-decoration: none; font-weight: 500; }
+a.commodity-link:hover { text-decoration: underline; }
+
+.chain-strip { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+.chain-node { text-align: center; flex: 1; }
+.chain-node .label { font-family: var(--font-label); font-size: 10.5px; text-transform: uppercase; color: var(--neutral-light); }
+.chain-node .price { font-size: 20px; font-weight: 600; margin-top: 4px; }
+.chain-arrow { color: var(--border); font-size: 18px; }
+
+.loading { color: var(--neutral-light); font-family: var(--font-label); font-size: 13px; padding: 40px 0; text-align: center; }
+
+@media print {
+  .topnav, .no-print { display: none !important; }
+  body { background: white; }
+  .page { padding: 0; max-width: none; }
+  .card, table { break-inside: avoid; }
+}

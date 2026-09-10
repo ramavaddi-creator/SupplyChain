@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: india-household-price-intelligence
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      # Set these in the Render dashboard once you have real values --
+      # never commit real keys into this file or into git.
+      # AGMARKNET_API_KEY
+      # CA_CSV_PATH
+      # WPI_CSV_PATH is no longer needed -- WPI fetches live automatically

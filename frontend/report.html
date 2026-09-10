@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>India Household Price Pulse</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .report-header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--primary); padding-bottom:14px; margin-bottom:24px; }
+  .report-title { font-size:28px; font-weight:700; margin:0; }
+  .report-meta { font-family: var(--font-label); font-size: 11.5px; color: var(--neutral-light); text-align:right; }
+  .print-btn { font-family: var(--font-label); font-size: 12px; background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+  .report-section { margin-bottom: 30px; }
+  .report-section h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<div class="topnav no-print" id="topnav"></div>
+<div class="page">
+  <div class="no-print" style="text-align:right;margin-bottom:12px;">
+    <button class="print-btn" onclick="window.print()">↓ Export / Print to PDF</button>
+  </div>
+
+  <div class="report-header">
+    <div>
+      <p class="eyebrow" style="margin-bottom:2px;">Institutional Intelligence Report</p>
+      <h1 class="report-title">India Household Price Pulse</h1>
+    </div>
+    <div class="report-meta" id="reportMeta"></div>
+  </div>
+
+  <div id="content" class="loading">Loading weekly report…</div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+async function render() {
+  await initTopNav("report");
+  const city = getCity();
+  const d = await fetchJSON(`/api/weekly-report?city=${encodeURIComponent(city)}`);
+  document.getElementById("reportMeta").innerHTML = `${city}<br>Week ending ${d.week_ending}`;
+
+  const material = d.most_material_price_movements;
+  const contrib = d.what_drove_the_basket;
+  const sv = d.structural_vs_volatile;
+  const gap = d.household_reality_gap;
+  const unseen = d.unseen_layer;
+  const telangana = d.telangana_lens;
+
+  document.getElementById("content").innerHTML = `
+
+    <div class="report-section">
+      <h2>1 · Most Material Price Movements</h2>
+      <p class="footnote" style="margin-bottom:10px;">Ranked by Movement + Materiality + Breadth + Persistence + Evidence — not raw percentage change alone.</p>
+      <table>
+        <thead><tr><th>Commodity</th><th>City</th><th>WoW</th><th>Household Impact</th><th>Persistence</th><th>Confidence</th><th>Classification</th></tr></thead>
+        <tbody>
+          ${material.map(m => `
+            <tr>
+              <td>${m.commodity}</td><td>${city}</td>
+              <td class="${pctClass(m.wow_pct)}">${fmtPct(m.wow_pct)}</td>
+              <td>${m.household_impact_score}/100</td>
+              <td>${m.persistence_score >= 60 ? "Sustained" : "Short-term"}</td>
+              <td><span class="badge ${m.signal_confidence.toLowerCase()}">${m.signal_confidence}</span></td>
+              <td><span class="badge ${m.classification.toLowerCase()}">${m.classification}</span></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="report-section">
+      <h2>2 · What Drove the Basket?</h2>
+      <p class="footnote" style="margin-bottom:10px;">Top contributors to Essential Basket MoM movement (${fmtPct(d.essential_basket_mom?.pct_change)}), by percentage-point contribution.</p>
+      <table>
+        <thead><tr><th>Commodity</th><th>MoM Change</th><th>Contribution (pts)</th></tr></thead>
+        <tbody>
+          ${contrib.map(c => `
+            <tr><td>${c.commodity}</td><td class="${pctClass(c.pct_change)}">${fmtPct(c.pct_change)}</td><td class="${pctClass(c.contribution_pts)}">${c.contribution_pts > 0 ? "+" : ""}${c.contribution_pts.toFixed(2)}</td></tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="report-section grid grid-2">
+      <div class="card">
+        <p class="card-label">Structural vs Volatile (MoM)</p>
+        <p class="card-value" style="font-size:22px;">
+          <span class="${pctClass(sv.structural)}">${fmtPct(sv.structural)}</span> structural ·
+          <span class="${pctClass(sv.volatile)}">${fmtPct(sv.volatile)}</span> volatile
+        </p>
+        <p class="footnote">Structural = recurring essentials (grains, dals, oil, dairy, cleaning, personal care). Volatile = seasonal produce.</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Household Reality Gap</p>
+        <p class="card-value ${pctClass(gap?.gap_pts)}" style="font-size:22px;">${gap ? (gap.gap_pts > 0 ? "+" : "") + gap.gap_pts.toFixed(2) : "—"} pts</p>
+        <p class="footnote">Observed Essential Basket ${fmtPct(gap?.observed_basket_mom)} MoM vs Official CPI ${fmtPct(gap?.cpi_mom)} MoM. Not a claim that CPI is wrong — the two measure different things.</p>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <h2>4 · Unseen Layer — Hidden Price Behaviour</h2>
+      <p class="footnote" style="margin-bottom:10px;">Commodities where Consumer Benefit Pass-Through is low — i.e. an upstream price fall did not proportionally reach local retail.</p>
+      ${unseen.length ? `
+      <table>
+        <thead><tr><th>Commodity</th><th>Consumer Benefit Pass-Through</th><th>Retail Transmission Lag</th></tr></thead>
+        <tbody>
+          ${unseen.map(u => `<tr><td>${u.commodity}</td><td>${u.consumer_benefit_pass_through}/100</td><td>${u.retail_transmission_lag_days !== null ? u.retail_transmission_lag_days + " days" : "—"}</td></tr>`).join("")}
+        </tbody>
+      </table>` : `<p class="footnote">No qualifying pass-through gap detected this week.</p>`}
+    </div>
+
+    <div class="report-section">
+      <h2>6 · Telangana Lens</h2>
+      <p class="footnote" style="margin-bottom:10px;">Essential Basket WoW movement — Hyderabad, Siddipet, Nizamabad only.</p>
+      <table>
+        <thead><tr><th>City</th><th>Essential Basket WoW</th><th>Coverage</th></tr></thead>
+        <tbody>
+          ${Object.entries(telangana).map(([c, bm]) => `<tr><td>${c}</td><td class="${pctClass(bm?.pct_change)}">${fmtPct(bm?.pct_change)}</td><td>${bm?.coverage_pct ?? "—"}%</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="footnote" style="margin-top:30px;border-top:1px solid var(--border);padding-top:12px;">
+      Data Integrity: sources are government feeds (AGMARKNET, Consumer Affairs, CPI/WPI) once connected, and manually entered / synthetic seed observations otherwise — see the Sources page for real, current counts. No proprietary node or scraper infrastructure claims are made without evidence.
+    </p>
+  `;
+}
+render();
+</script>
+</body>
+</html>

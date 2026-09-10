@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+
+# The database is ~150MB+ (exceeds GitHub's 100MB file limit) and contains
+# synthetic seed data anyway -- app.py's bootstrap_fresh_database() startup
+# hook regenerates it automatically from seed.py on first launch against an
+# empty database. Real data (once AGMARKNET/Consumer Affairs/CPI/WPI are
+# live) accumulates fresh after that -- it was never meant to be the
+# permanent record; see README's note on persistent hosting if you need one.
+data/hpi.db
