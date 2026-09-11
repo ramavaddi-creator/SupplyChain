@@ -50,9 +50,10 @@ class PPACFuelConnector(BaseConnector):
         saved = 0
         for r in rows:
             cur.execute(
-                """INSERT OR IGNORE INTO external_drivers
+                """INSERT INTO external_drivers
                    (driver_type, scope, observation_date, value, unit, source_id, data_quality_score)
-                   VALUES ('diesel_price','national',?,?, 'INR/litre', ?, ?)""",
+                   VALUES ('diesel_price','national',?,?, 'INR/litre', ?, ?)
+                   ON CONFLICT (driver_type, scope, observation_date) DO NOTHING""",
                 (r["date"], r["value"], self.get_source_id(), self.quality_grade_default),
             )
             saved += cur.rowcount
@@ -95,9 +96,10 @@ class IMDRainfallConnector(BaseConnector):
         saved = 0
         for r in rows:
             cur.execute(
-                """INSERT OR IGNORE INTO external_drivers
+                """INSERT INTO external_drivers
                    (driver_type, scope, observation_date, value, unit, source_id, data_quality_score)
-                   VALUES ('rainfall_mm', ?, ?, ?, 'mm', ?, ?)""",
+                   VALUES ('rainfall_mm', ?, ?, ?, 'mm', ?, ?)
+                   ON CONFLICT (driver_type, scope, observation_date) DO NOTHING""",
                 (r["scope"], r["date"], r["value"], self.get_source_id(), self.quality_grade_default),
             )
             saved += cur.rowcount

@@ -4,6 +4,11 @@ __pycache__/
 .env
 .DS_Store
 
+# Contains real secrets (AGMARKNET key, Neon connection string) filled in
+# from the run_local_ingestion.sh template -- never commit the filled-in
+# version, only the template with placeholder text stays in git.
+backend/run_local_ingestion.local.sh
+
 # The database is ~150MB+ (exceeds GitHub's 100MB file limit) and contains
 # synthetic seed data anyway -- app.py's bootstrap_fresh_database() startup
 # hook regenerates it automatically from seed.py on first launch against an

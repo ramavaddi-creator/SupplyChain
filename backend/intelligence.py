@@ -303,9 +303,11 @@ def evidence_trace(conn, product_id, location_id, channel="local_retail", commod
     )
     grade_dist = {r["data_quality_score"]: r["n"] for r in cur.fetchall()}
 
+    from datetime import datetime, timedelta
+    cutoff_date = (datetime.strptime(latest_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
     cur.execute(
-        "SELECT COUNT(*) as n FROM price_observations WHERE product_id=? AND location_id=? AND channel=? AND provisional_flag=1 AND observation_date >= date(?, '-30 days')",
-        (product_id, location_id, channel, latest_date),
+        "SELECT COUNT(*) as n FROM price_observations WHERE product_id=? AND location_id=? AND channel=? AND provisional_flag=1 AND observation_date >= ?",
+        (product_id, location_id, channel, cutoff_date),
     )
     provisional_count = cur.fetchone()["n"]
 

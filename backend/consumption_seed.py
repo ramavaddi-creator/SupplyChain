@@ -36,15 +36,19 @@ def seed_consumption_hces():
     inserted = 0
     for item_group, r_mpce, r_share, u_mpce, u_share in ROWS:
         cur.execute(
-            "INSERT OR REPLACE INTO consumption_hces "
+            "INSERT INTO consumption_hces "
             "(survey_round, geography, item_group, mpce_rs, share_pct, source_url) "
-            "VALUES (?, 'rural', ?, ?, ?, ?)",
+            "VALUES (?, 'rural', ?, ?, ?, ?) "
+            "ON CONFLICT (survey_round, geography, item_group) "
+            "DO UPDATE SET mpce_rs=EXCLUDED.mpce_rs, share_pct=EXCLUDED.share_pct, source_url=EXCLUDED.source_url",
             (ROUND, item_group, r_mpce, r_share, SOURCE_URL),
         )
         cur.execute(
-            "INSERT OR REPLACE INTO consumption_hces "
+            "INSERT INTO consumption_hces "
             "(survey_round, geography, item_group, mpce_rs, share_pct, source_url) "
-            "VALUES (?, 'urban', ?, ?, ?, ?)",
+            "VALUES (?, 'urban', ?, ?, ?, ?) "
+            "ON CONFLICT (survey_round, geography, item_group) "
+            "DO UPDATE SET mpce_rs=EXCLUDED.mpce_rs, share_pct=EXCLUDED.share_pct, source_url=EXCLUDED.source_url",
             (ROUND, item_group, u_mpce, u_share, SOURCE_URL),
         )
         inserted += 2

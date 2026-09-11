@@ -149,7 +149,7 @@ def seed():
 
     city_ids = {}
     for city, state, tier, fresh_f, pkg_f in CITIES:
-        cur.execute("INSERT OR IGNORE INTO locations (city, state, tier) VALUES (?,?,?)", (city, state, tier))
+        cur.execute("INSERT INTO locations (city, state, tier) VALUES (?,?,?) ON CONFLICT (city, state) DO NOTHING", (city, state, tier))
         cur.execute("SELECT id FROM locations WHERE city=? AND state=?", (city, state))
         city_ids[city] = cur.fetchone()["id"]
 
@@ -163,7 +163,7 @@ def seed():
     source_ids = {}
     for name, stype, connector, freq, grade in sources:
         cur.execute(
-            "INSERT OR IGNORE INTO data_sources (source_name, source_type, connector_name, update_frequency, quality_grade_default, active_status) VALUES (?,?,?,?,?,1)",
+            "INSERT INTO data_sources (source_name, source_type, connector_name, update_frequency, quality_grade_default, active_status) VALUES (?,?,?,?,?,1) ON CONFLICT (source_name) DO NOTHING",
             (name, stype, connector, freq, grade),
         )
         cur.execute("SELECT id FROM data_sources WHERE source_name=?", (name,))
