@@ -36,7 +36,7 @@ class AGMARKNETConnector(BaseConnector):
         if commodity:
             params["filters[commodity]"] = commodity
         try:
-            resp = requests.get(API_URL, params=params, timeout=15)
+            resp = requests.get(API_URL, params=params, timeout=30)
             resp.raise_for_status()
             records = resp.json().get("records", [])
             print(f"AGMARKNET: fetched {len(records)} records successfully")
