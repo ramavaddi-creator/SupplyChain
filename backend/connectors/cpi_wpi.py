@@ -119,11 +119,20 @@ class WPIConnector(BaseConnector):
             return None
 
         import re
-        match = re.search(r'href="(https://eaindustry\.nic\.in/indx_download_2223/wpi_monthly_index_\d+\.xlsx)"', page.text)
+        # More tolerant than a strict href="..." match: the exact quote
+        # style and relative-vs-absolute URL format weren't verifiable from
+        # this environment (web_fetch renders pages as markdown, not raw
+        # HTML, so the real attribute syntax couldn't be confirmed before
+        # deploy). This searches for the distinctive filename pattern
+        # anywhere in the page and reconstructs an absolute URL if needed,
+        # rather than requiring one specific HTML quoting style to match.
+        match = re.search(r'(?:https://eaindustry\.nic\.in)?/?indx_download_2223/wpi_monthly_index_\d+\.xlsx', page.text)
         if not match:
-            print("WPI: download page fetched OK, but couldn't find the .xlsx link pattern in it -- page structure may have changed")
+            snippet = page.text[:300].replace("\n", " ")
+            print(f"WPI: download page fetched OK, but couldn't find the .xlsx link pattern. Page starts with: {snippet}")
             return None
-        xlsx_url = match.group(1)
+        found = match.group(0)
+        xlsx_url = found if found.startswith("http") else f"https://eaindustry.nic.in/{found.lstrip('/')}"
         print(f"WPI: found xlsx link -- {xlsx_url}")
 
         try:
