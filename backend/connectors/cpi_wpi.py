@@ -103,28 +103,52 @@ class WPIConnector(BaseConnector):
         against the actual downloaded file to confirm columns line up.
         """
         try:
-            page = requests.get(self.DOWNLOAD_PAGE, timeout=15)
+            page = requests.get(self.DOWNLOAD_PAGE, timeout=30)
             page.raise_for_status()
-        except Exception:
+        except requests.exceptions.Timeout:
+            print("WPI: download page request timed out after 30s")
+            return None
+        except requests.exceptions.ConnectionError as e:
+            print(f"WPI: connection failed reaching download page -- {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            print(f"WPI: download page returned HTTP error -- {e}")
+            return None
+        except Exception as e:
+            print(f"WPI: unexpected error fetching download page -- {type(e).__name__}: {e}")
             return None
 
         import re
         match = re.search(r'href="(https://eaindustry\.nic\.in/indx_download_2223/wpi_monthly_index_\d+\.xlsx)"', page.text)
         if not match:
+            print("WPI: download page fetched OK, but couldn't find the .xlsx link pattern in it -- page structure may have changed")
             return None
         xlsx_url = match.group(1)
+        print(f"WPI: found xlsx link -- {xlsx_url}")
 
         try:
             resp = requests.get(xlsx_url, timeout=30)
             resp.raise_for_status()
-        except Exception:
+        except requests.exceptions.Timeout:
+            print("WPI: .xlsx download timed out after 30s")
+            return None
+        except requests.exceptions.ConnectionError as e:
+            print(f"WPI: connection failed downloading .xlsx -- {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            print(f"WPI: .xlsx download returned HTTP error -- {e}")
+            return None
+        except Exception as e:
+            print(f"WPI: unexpected error downloading xlsx -- {type(e).__name__}: {e}")
             return None
 
         import io
         try:
             from openpyxl import load_workbook
             wb = load_workbook(io.BytesIO(resp.content), read_only=True, data_only=True)
-        except Exception:
+            print(f"WPI: xlsx downloaded and parsed successfully ({len(resp.content)} bytes)")
+        except Exception as e:
+            print(f"WPI: downloaded file but openpyxl couldn't parse it -- {type(e).__name__}: {e}")
             return None
         return wb
 
