@@ -468,7 +468,7 @@ def api_sources():
 
     cur.execute("SELECT COUNT(*) as n FROM price_observations WHERE source_id=?", (seed_source_id,))
     seed_obs = cur.fetchone()["n"] if seed_source_id else 0
-    cur.execute("SELECT COUNT(*) as n FROM price_observations WHERE source_id IS NOT ? OR ? IS NULL", (seed_source_id, seed_source_id))
+    cur.execute("SELECT COUNT(*) as n FROM price_observations WHERE ? IS NULL OR source_id != ?", (seed_source_id, seed_source_id))
     live_obs = cur.fetchone()["n"] if seed_source_id else 0
     cur.execute("SELECT COUNT(*) as n FROM price_observations")
     total_obs = cur.fetchone()["n"]
