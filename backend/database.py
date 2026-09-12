@@ -312,7 +312,7 @@ class PGConnWrapper:
     def __init__(self, url):
         import psycopg2
         import psycopg2.extras
-        self._conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+        self._conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=15)
 
     def cursor(self):
         return PGCursorWrapper(self._conn.cursor())
