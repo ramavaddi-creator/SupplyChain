@@ -17,11 +17,12 @@ from connectors.agmarknet import AGMARKNETConnector
 from connectors.consumer_affairs import ConsumerAffairsConnector
 from connectors.cpi_wpi import CPIConnector, WPIConnector
 from connectors.external_drivers import PPACFuelConnector, IMDRainfallConnector
+from connectors.global_benchmarks import WorldBankCommodityConnector, FAOFoodPriceIndexConnector
 import synthetic_daily as SD
 import intelligence as I
 
 REAL_CONNECTORS = [AGMARKNETConnector, ConsumerAffairsConnector, CPIConnector, WPIConnector,
-                    PPACFuelConnector, IMDRainfallConnector]
+                    PPACFuelConnector, IMDRainfallConnector, WorldBankCommodityConnector, FAOFoodPriceIndexConnector]
 
 
 def run_daily_ingestion(force=False):

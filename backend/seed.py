@@ -158,6 +158,8 @@ def seed():
         ("Consumer Affairs Price Monitoring", "government", "ConsumerAffairsConnector", "daily", "A"),
         ("CPI (MOSPI)", "government", "CPIConnector", "monthly", "A"),
         ("WPI (OEA)", "government", "WPIConnector", "monthly", "A"),
+ ("World Bank Pink Sheet", "international", "WorldBankCommodityConnector", "monthly", "B"),
+ ("FAO Food Price Index", "international", "FAOFoodPriceIndexConnector", "monthly", "B"),
         ("Manual / Seed Synthetic", "manual", "SeedGenerator", "n/a", "E"),
     ]
     source_ids = {}
